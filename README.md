@@ -132,6 +132,11 @@ playwright show-trace reports/traces/<test-name>.zip
 | Screenshots | `reports/screenshots/` |
 | Traces | `reports/traces/` |
 
+**A committed sample run** lives in [`reports/sample-run/`](reports/sample-run/) —
+the HTML report, the JUnit XML, and eight screenshots following one scenario
+through all four functions, including the live cart at `ILS 587.50`. Everything
+else under `reports/` is regenerated per run and excluded for size.
+
 ---
 
 ## Assumptions and limitations
