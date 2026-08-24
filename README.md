@@ -136,15 +136,27 @@ playwright show-trace reports/traces/<test-name>.zip
 
 ## Assumptions and limitations
 
-**1. The cart page is behind eBay's bot verification — this is the one blocker.**
+**1. The cart page is intermittently behind eBay's bot verification.**
 
-Items are added to the cart successfully and verifiably (eBay's own header
-counter increments and the button flips to "See in cart"). But navigating to
-`cart.ebay.com` afterwards is redirected to `/splashui/captcha` — "Please verify
-yourself to continue". This reproduces in headless *and* headed Chromium, via
-direct navigation and via the in-page cart link.
+This is the main environmental caveat. Navigating to `cart.ebay.com` is
+*sometimes* redirected to `/splashui/captcha` — "Please verify yourself to
+continue". Two consecutive full-suite runs gave different results:
 
-Solving or bypassing a captcha is deliberately out of scope. Instead:
+| Run | Cart scenarios reached | Skipped by the challenge |
+|---|---|---|
+| 1 | 0 / 3 | 3 |
+| 2 | 1 / 3 (`rare_item_few_results`) | 2 |
+
+So the live cart path **does** work end to end when the challenge does not fire —
+run 2 read a real subtotal of `587.50` and asserted it against the
+`150 x 5 = 750.00` threshold. The block is intermittent, not absolute, and it is
+unrelated to which scenario is running.
+
+Adding to the cart is never the problem: it succeeds every time and is
+independently verifiable (eBay's own header counter increments and the button
+flips to "See in cart"). Only the subsequent cart *page load* is challenged.
+
+Solving or bypassing a captcha is deliberately out of scope. So:
 
 * `BasePage.raise_if_bot_challenge()` detects the interstitial and raises a typed
   `BotChallengeError` with a screenshot, so a blocked run is never mistaken for a
@@ -155,8 +167,8 @@ Solving or bypassing a captcha is deliberately out of scope. Instead:
   (`tests/fixtures/cart.html`) — covering the within-budget pass, the
   over-budget `CartTotalExceededError`, and threshold scaling by item count.
 
-If the suite is run from an IP or a browser profile eBay trusts, the live path
-executes unchanged — no code change is needed.
+Run from an IP or browser profile eBay trusts, the live path executes unchanged —
+no code change is needed, as run 2 demonstrates. Re-running is often enough.
 
 **2. Authentication defaults to a guest session.** eBay guards its sign-in form
 with the same bot challenge. `AUTH_STRATEGY=guest` (the default) establishes and
@@ -195,15 +207,30 @@ condition, the result count, and uniqueness — not semantic relevance.
 
 ## Verified run
 
+Two consecutive full runs of the whole suite (21 tests, ~9 min each):
+
 ```
-tests/test_price_parser.py ............                    12 passed
-tests/test_cart_assertion_offline.py ...                    3 passed
-tests/test_e2e_cart_budget.py::test_cart_total_stays_within_budget[shoes_under_220]
-    search 'shoes' <= 220.00 -> 5/5 items on 1 page
-    [1/5] Quick Dry Aqua Socks    | variants {'color': 'Black', 'size': 'UK 7.5-8.5'}   | added=True
-    [2/5] Half Round Shoelaces    | variants {'color': 'dark beige', 'size': '180cm'}   | added=True
-    [3/5] SNORS Shoelaces         | variants {'Länge': '90 cm', 'Farbe': 'Creme', ...}  | added=True
-    [4/5] ECCO Leather Insoles    | variants {'Color': 'Brown', 'Size': 'US15-15.5'}    | added=True
-    [5/5] Vibram FiveFingers      | variants {'Color': 'Black', 'Size': '39'}           | added=True
-    cart -> SKIPPED (eBay bot-verification page; see limitation 1)
+run 1:  18 passed, 3 skipped
+run 2:  19 passed, 2 skipped
+```
+
+Every skip is the documented cart challenge, reported with its reason and a
+screenshot path. Sample from the `shoes_under_220` scenario:
+
+```
+search 'shoes' <= 220.00 -> 5/5 items on 1 page
+[1/5] Quick Dry Aqua Socks    | variants {'color': 'Black', 'size': 'UK 7.5-8.5'}   | added=True
+[2/5] Half Round Shoelaces    | variants {'color': 'dark beige', 'size': '180cm'}   | added=True
+[3/5] SNORS Shoelaces         | variants {'Länge': '90 cm', 'Farbe': 'Creme', ...}  | added=True
+[4/5] ECCO Leather Insoles    | variants {'Color': 'Brown', 'Size': 'US15-15.5'}    | added=True
+[5/5] Vibram FiveFingers      | variants {'Color': 'Black', 'Size': '39'}           | added=True
+```
+
+And the full live path, including the cart, from `rare_item_few_results` in run 2:
+
+```
+search 'vintage brass sextant' <= 150.00 -> 5/5 items on 1 page
+5 items added to the cart
+Cart amount read from the page: 587.50
+Cart subtotal 587.50 <= threshold 750.00 - OK
 ```
