@@ -1,0 +1,28 @@
+{
+  "scenarios": [
+    {
+      "id": "shoes_under_220",
+      "description": "Search shoes with a max price of 220, add up to 5 to the cart and assert the cart total",
+      "query": "shoes",
+      "max_price": 220.0,
+      "limit": 5,
+      "budget_per_item": 220.0
+    },
+    {
+      "id": "headphones_under_60",
+      "description": "Cheaper category to exercise the price filter and paging",
+      "query": "headphones",
+      "max_price": 60.0,
+      "limit": 5,
+      "budget_per_item": 60.0
+    },
+    {
+      "id": "rare_item_few_results",
+      "description": "Narrow query that is expected to return fewer than `limit` items - the flow must still pass",
+      "query": "vintage brass sextant",
+      "max_price": 150.0,
+      "limit": 5,
+      "budget_per_item": 150.0
+    }
+  ]
+}

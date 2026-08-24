@@ -1,0 +1,36 @@
+# ---------------------------------------------------------------------------
+# Base configuration. Every value can be overridden by an environment variable
+# (see src/core/config.py) or by a profile file: config/config.<PROFILE>.yaml
+# ---------------------------------------------------------------------------
+app:
+  base_url: "https://www.ebay.com"
+  currency_symbol: "$"
+  locale: "en-US"
+
+browser:
+  name: "chromium"          # chromium | firefox | webkit
+  headless: true
+  slow_mo_ms: 0
+  viewport:
+    width: 1920
+    height: 1080
+  default_timeout_ms: 20000
+  navigation_timeout_ms: 45000
+
+auth:
+  # eBay blocks automated logins behind a captcha, so the default strategy is
+  # "guest". Set AUTH_STRATEGY=credentials + EBAY_USER / EBAY_PASS to try a real
+  # login. See README -> Assumptions.
+  strategy: "guest"         # guest | credentials
+  username: ""
+  password: ""
+
+reporting:
+  screenshots_dir: "reports/screenshots"
+  traces_dir: "reports/traces"
+  record_trace: true
+  screenshot_on_failure: true
+
+runtime:
+  max_pages_to_scan: 5      # paging safety-net for the search function
+  retries: 2

@@ -1,0 +1,18 @@
+<!doctype html>
+<!--
+  Offline replica of eBay's cart markup (the data-test-id hooks CartPage relies on).
+  It lets the cart-reading and budget-assertion logic be verified deterministically,
+  which matters because the live cart.ebay.com is behind bot verification.
+-->
+<html><head><meta charset="utf-8"><title>Shopping cart | eBay</title></head>
+<body>
+  <h1>Shopping cart</h1>
+  <div data-test-id="cart-line-item"><span>2 PAIRS SNORS Shoelaces</span><span>$5.99</span></div>
+  <div data-test-id="cart-line-item"><span>Quick Dry Aqua Socks</span><span>$0.99</span></div>
+  <div data-test-id="cart-line-item"><span>New ECCO Men's Insoles</span><span>$14.00</span></div>
+  <div class="summary">
+    <span>Subtotal (3 items)</span>
+    <div data-test-id="SUBTOTAL"><span class="text-display-span">$20.98</span></div>
+    <div data-test-id="TOTAL"><span>$20.98</span></div>
+  </div>
+</body></html>

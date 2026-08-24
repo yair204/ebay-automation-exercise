@@ -1,0 +1,6 @@
+# Local debugging profile: run with PROFILE=local
+browser:
+  headless: false
+  slow_mo_ms: 150
+reporting:
+  record_trace: true

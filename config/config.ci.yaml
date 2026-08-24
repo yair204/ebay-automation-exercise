@@ -1,0 +1,8 @@
+# CI profile: run with PROFILE=ci
+browser:
+  headless: true
+  slow_mo_ms: 0
+reporting:
+  record_trace: true
+runtime:
+  max_pages_to_scan: 3
