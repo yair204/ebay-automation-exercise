@@ -7,7 +7,7 @@ from typing import Dict, List, Optional
 
 from playwright.sync_api import Locator, TimeoutError as PlaywrightTimeoutError
 
-from src.core.base_page import BasePage
+from src.core.base_page import BasePage, xp_deepest_with_text, xp_has_class, xp_has_text
 from src.core.price_parser import PriceParser
 
 
@@ -22,48 +22,58 @@ class AddToCartResult:
 
 
 class ItemPage(BasePage):
-    _TITLE = ("h1.x-item-title__mainTitle span", "h1[itemprop='name']", "h1.x-item-title__mainTitle", "h1")
+    _TITLE = (
+        f"xpath=//h1[{xp_has_class('x-item-title__mainTitle')}]//span[normalize-space()]",
+        "xpath=//h1[@itemprop='name']",
+        f"xpath=//h1[{xp_has_class('x-item-title__mainTitle')}]",
+        "xpath=//h1[normalize-space()]",
+    )
     _PRICE = (
-        "div[data-testid='x-price-primary'] span.ux-textspans",
-        "span[itemprop='price']",
-        "#prcIsum",
-        "#mm-saleDscPrc",
-        ".x-price-primary span",
+        f"xpath=//div[@data-testid='x-price-primary']//span[{xp_has_class('ux-textspans')}]",
+        "xpath=//span[@itemprop='price']",
+        "xpath=//*[@id='prcIsum' or @id='mm-saleDscPrc']",
+        f"xpath=//*[{xp_has_class('x-price-primary')}]//span[normalize-space()]",
     )
     # The item page renders BOTH "Buy It Now" and "Add to cart" as
     # a[data-testid='ux-call-to-action'], so the id / text is what disambiguates
     # them - matching on data-testid alone would click "Buy It Now".
     _ADD_TO_CART = (
-        "a#atcBtn_btn_1",
-        "a[id^='atcBtn_btn']",
-        "a[data-testid='ux-call-to-action']:has-text('Add to cart')",
-        "a#atcRedesignId_btn",
-        "button:has-text('Add to cart')",
+        "xpath=//a[@id='atcBtn_btn_1']",
+        "xpath=//a[starts-with(@id, 'atcBtn_btn')]",
+        # Both CTAs share data-testid='ux-call-to-action'; only the text tells
+        # "Add to cart" apart from "Buy It Now", so the predicate is essential.
+        f"xpath=//a[@data-testid='ux-call-to-action'][{xp_has_text('add to cart')}]",
+        "xpath=//a[@id='atcRedesignId_btn']",
+        f"xpath=//button[{xp_has_text('add to cart')}]",
     )
     # Scoped to the variant widget: an unscoped `select` would also match the
     # header's category dropdown (#gh-cat) and silently change the search scope.
     _VARIANT_SELECTS = (
-        ".x-msku select.listbox__native, "
-        ".x-msku-evo select.listbox__native, "
-        "select[name^='msku']"
+        f"xpath=//*[{xp_has_class('x-msku')} or {xp_has_class('x-msku-evo')}]"
+        f"//select[{xp_has_class('listbox__native')}]"
+        f" | //select[starts-with(@name, 'msku')]"
     )
     _VARIANT_BUTTONS = (
-        ".x-msku-evo button.listbox-button__control[aria-expanded], "
-        ".x-msku button.listbox-button__control[aria-expanded], "
-        "div[data-testid='x-msku'] button[aria-expanded]"
+        f"xpath=//*[{xp_has_class('x-msku-evo')} or {xp_has_class('x-msku')}]"
+        f"//button[@aria-expanded][{xp_has_class('listbox-button__control')}]"
+        f" | //div[@data-testid='x-msku']//button[@aria-expanded]"
     )
-    # `:visible` matters: every group's options live in the DOM at once, so an
-    # unscoped match would resolve to the *closed* listbox's hidden entries.
-    _VARIANT_OPTIONS = "[role='option']:visible, .listbox__option:visible"
+    # Every group's options live in the DOM at once, so a match must be filtered
+    # down to the *open* listbox. XPath 1.0 cannot express visibility, so unlike
+    # the CSS `:visible` pseudo-class this is filtered in code - see
+    # `_pick_random_option`, which skips anything not actually rendered.
+    _VARIANT_OPTIONS = (
+        f"xpath=//*[@role='option'] | //*[{xp_has_class('listbox__option')}]"
+    )
     _VARIANT_ERROR = (
-        "text=/Please select|Select a valid|required option/i",
-        "[role='alert']:has-text('select')",
+        f"xpath={xp_deepest_with_text('please select')}"
+        f" | {xp_deepest_with_text('select a valid')}",
+        f"xpath=//*[@role='alert'][{xp_has_text('select')}]",
     )
     _ADDED_CONFIRMATION = (
-        "text=/Added to cart/i",
-        "h1:has-text('Shopping cart')",
-        "[data-test-id='cart-line-item']",
-        "[data-testid='cart-line-item']",
+        f"xpath={xp_deepest_with_text('added to cart')}",
+        f"xpath=//h1[{xp_has_text('shopping cart')}]",
+        "xpath=//*[@data-test-id='cart-line-item' or @data-testid='cart-line-item']",
     )
 
     def __init__(self, page, config=None, rng: Optional[random.Random] = None) -> None:
@@ -146,13 +156,19 @@ class ItemPage(BasePage):
         """Click a random selectable entry in the currently expanded listbox."""
         options = self.page.locator(self._VARIANT_OPTIONS)
         try:
-            options.first.wait_for(state="visible", timeout=4000)
+            # Wait on the visible subset: `options.first` is the *closed* group's
+            # hidden entry, which would never become visible.
+            self.page.locator(f"{self._VARIANT_OPTIONS} >> visible=true").first.wait_for(
+                state="visible", timeout=4000
+            )
         except PlaywrightTimeoutError:
             return None
 
         candidates: List[int] = []
         for index in range(options.count()):
             option = options.nth(index)
+            if not option.is_visible():
+                continue
             text = self.safe_text(option).lower()
             disabled = option.get_attribute("aria-disabled") == "true"
             # Skip the placeholder and anything unavailable.
@@ -205,7 +221,9 @@ class ItemPage(BasePage):
         return chosen
 
     def set_quantity(self, quantity: int) -> None:
-        box: Optional[Locator] = self.first_visible(("input#qtyTextBox", "input[name='quantity']"), timeout_ms=2000)
+        box: Optional[Locator] = self.first_visible(
+            ("xpath=//input[@id='qtyTextBox']", "xpath=//input[@name='quantity']"), timeout_ms=2000
+        )
         if box is not None:
             box.fill(str(quantity))
 

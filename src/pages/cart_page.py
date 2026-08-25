@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from src.core.base_page import BasePage
+from src.core.base_page import BasePage, xp_deepest_with_text, xp_has_text
 from src.core.price_parser import PriceParser
 
 
@@ -11,15 +11,25 @@ class CartPage(BasePage):
     URL_PATH = "https://cart.ebay.com/"
 
     _SUBTOTAL = (
-        "[data-test-id='SUBTOTAL'] span.text-display-span",
-        "[data-test-id='SUBTOTAL']",
-        "span:has-text('Subtotal') >> xpath=following::span[1]",
-        "[data-test-id='cart-subtotal']",
-        "text=/Subtotal \\(\\d+ items?\\)/",
+        "xpath=//*[@data-test-id='SUBTOTAL']"
+        "//span[contains(concat(' ', normalize-space(@class), ' '), ' text-display-span ')]",
+        "xpath=//*[@data-test-id='SUBTOTAL']",
+        "xpath=//*[@data-test-id='cart-subtotal']",
+        # Structural fallback: find the "Subtotal" label and walk the `following`
+        # axis to the next element that actually holds a value. This is the case
+        # XPath handles and CSS cannot express at all.
+        f"xpath=//span[{xp_has_text('subtotal')}]/following::span[normalize-space()][1]",
     )
-    _TOTAL = ("[data-test-id='TOTAL']", "[data-test-id='ORDER_TOTAL']")
-    _LINE_ITEMS = "[data-test-id='cart-line-item'], .cart-bucket .item-card"
-    _EMPTY = "text=/Your shopping cart is empty|Your cart is empty/i"
+    _TOTAL = (
+        "xpath=//*[@data-test-id='TOTAL']",
+        "xpath=//*[@data-test-id='ORDER_TOTAL']",
+    )
+    _LINE_ITEMS = (
+        "xpath=//*[@data-test-id='cart-line-item']"
+        " | //*[contains(concat(' ', normalize-space(@class), ' '), ' cart-bucket ')]"
+        "//*[contains(concat(' ', normalize-space(@class), ' '), ' item-card ')]"
+    )
+    _EMPTY = f"xpath={xp_deepest_with_text('your cart is empty')}"
 
     def open_cart(self) -> "CartPage":
         self.open(self.URL_PATH)

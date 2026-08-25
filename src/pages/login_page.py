@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.core.base_page import BasePage
+from src.core.base_page import BasePage, xp_deepest_with_text, xp_has_text
 
 
 @dataclass(frozen=True)
@@ -22,12 +22,23 @@ class AuthResult:
 class LoginPage(BasePage):
     URL_PATH = "https://www.ebay.com/signin/"
 
-    _USERNAME = ("input#userid", "input[name='userid']")
-    _PASSWORD = ("input#pass", "input[name='pass']")
-    _CONTINUE = ("button#signin-continue-btn", "button[type='submit']")
-    _SIGNIN_SUBMIT = ("button#sgnBt", "button[type='submit']")
-    _SIGNED_IN_MARKER = ("#gh-ug", "a[href*='myebay']", "text=/Hi [A-Za-z]/")
-    _CHALLENGE = ("text=/verify yourself|unusual activity|captcha/i", "iframe[title*='challenge']")
+    _USERNAME = ("xpath=//input[@id='userid']", "xpath=//input[@name='userid']")
+    _PASSWORD = ("xpath=//input[@id='pass']", "xpath=//input[@name='pass']")
+    _CONTINUE = (
+        "xpath=//button[@id='signin-continue-btn']",
+        "xpath=//button[@type='submit']",
+    )
+    _SIGNIN_SUBMIT = ("xpath=//button[@id='sgnBt']", "xpath=//button[@type='submit']")
+    _SIGNED_IN_MARKER = (
+        "xpath=//*[@id='gh-ug']",
+        "xpath=//a[contains(@href, 'myebay')]",
+        f"xpath=//*[starts-with(normalize-space(), 'Hi ')][not(.//*[starts-with(normalize-space(), 'Hi ')])]",
+    )
+    _CHALLENGE = (
+        f"xpath={xp_deepest_with_text('verify yourself')}"
+        f" | {xp_deepest_with_text('unusual activity')}",
+        f"xpath=//iframe[{xp_has_text('challenge', '@title')}]",
+    )
 
     # ------------------------------------------------------------------ API
     def authenticate(self) -> AuthResult:

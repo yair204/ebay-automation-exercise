@@ -13,6 +13,42 @@ from src.core.logger import get_logger
 
 _SAFE_NAME = re.compile(r"[^A-Za-z0-9_.-]+")
 
+_UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+_LOWER = "abcdefghijklmnopqrstuvwxyz"
+
+
+def xp_lower(expression: str = ".") -> str:
+    """XPath 1.0 has no lower-case(), so case folding goes through translate().
+
+    ``xp_lower()`` folds an element's whole text; pass an attribute such as
+    ``"@aria-label"`` to fold that instead.
+    """
+    return f"translate({expression}, '{_UPPER}', '{_LOWER}')"
+
+
+def xp_has_text(text: str, expression: str = ".") -> str:
+    """Case-insensitive "contains this text" predicate."""
+    return f"contains({xp_lower(expression)}, '{text.lower()}')"
+
+
+def xp_deepest_with_text(text: str, tags: str = "*") -> str:
+    """Match the *innermost* element containing ``text``.
+
+    A bare `//*[contains(., 'foo')]` also matches every ancestor up to <html>,
+    and `.first` in document order is therefore the outermost one - which is not
+    the element a caller means and is usually reported as not visible. The
+    `not(.//*[...])` predicate keeps only nodes with no matching descendant,
+    which is the XPath idiom equivalent to Playwright's `text=` engine.
+    """
+    condition = xp_has_text(text)
+    return f"//{tags}[{condition}][not(.//*[{condition}])]"
+
+
+def xp_has_class(name: str) -> str:
+    """Whole-word class match - `contains(@class,'s-item')` alone also matches
+    's-item__title', which is rarely what a selector means."""
+    return f"contains(concat(' ', normalize-space(@class), ' '), ' {name} ')"
+
 
 class BotChallengeError(RuntimeError):
     """eBay served its "Security Measure" interstitial instead of the page.
@@ -38,13 +74,15 @@ class BasePage:
 
     # eBay redirects to /splashui/captcha when it decides a session is automated.
     _CHALLENGE_URL_MARKER = "/splashui/captcha"
-    _CHALLENGE_TEXT = "text=/Please verify yourself|Security Measure/i"
+    _CHALLENGE_TEXT = (
+        f"xpath=//*[self::h1 or self::h2 or self::p]"
+        f"[{xp_has_text('please verify yourself')} or {xp_has_text('security measure')}]"
+    )
 
     _CONSENT_SELECTORS: Sequence[str] = (
-        "#gdpr-banner-accept",
-        "button:has-text('Accept all')",
-        "button:has-text('Accept All')",
-        "[aria-label='Accept all cookies']",
+        "xpath=//*[@id='gdpr-banner-accept']",
+        f"xpath=//button[{xp_has_text('accept all')}]",
+        f"xpath=//*[{xp_has_text('accept all cookies', '@aria-label')}]",
     )
 
     def __init__(self, page: Page, config: Optional[Config] = None) -> None:

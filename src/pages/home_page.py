@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from src.core.base_page import BasePage
+from src.core.base_page import BasePage, xp_has_text
 from src.pages.search_results_page import SearchResultsPage
 
 
@@ -11,16 +11,18 @@ class HomePage(BasePage):
     URL_PATH = "/"
 
     _SEARCH_INPUT = (
-        "input#gh-ac",
-        "input[name='_nkw']",
-        "input[aria-label='Search for anything']",
+        "xpath=//input[@id='gh-ac']",
+        "xpath=//input[@name='_nkw']",
+        f"xpath=//input[{xp_has_text('search for anything', '@aria-label')}]",
     )
     _SEARCH_BUTTON = (
-        "#gh-search-btn",
-        "#gh-btn",
-        "input[type='submit'][value='Search']",
+        "xpath=//*[@id='gh-search-btn' or @id='gh-btn']",
+        "xpath=//input[@type='submit' and @value='Search']",
     )
-    _ERROR_PAGE = "text=/Error Page|something went wrong/i"
+    _ERROR_PAGE = (
+        f"xpath=//*[self::h1 or self::h2]"
+        f"[{xp_has_text('error page')} or {xp_has_text('something went wrong')}]"
+    )
 
     def search(self, query: str, max_price: Optional[float] = None) -> SearchResultsPage:
         """Search for ``query``, preferring the header search box.

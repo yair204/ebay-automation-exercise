@@ -7,7 +7,7 @@ from urllib.parse import quote_plus, urlparse, urlunparse
 
 from playwright.sync_api import Locator, TimeoutError as PlaywrightTimeoutError
 
-from src.core.base_page import BasePage
+from src.core.base_page import BasePage, xp_deepest_with_text, xp_has_class, xp_has_text, xp_lower
 from src.core.price_parser import PriceParser
 
 
@@ -28,46 +28,51 @@ class SearchResultsPage(BasePage):
 
     # --- Item cards. XPath as required by the exercise, with CSS fallbacks that
     #     cover eBay's newer "brw" grid layout.
+    # Whole-word class matching: a plain contains(@class,'s-item') would also
+    # match the child 's-item__title' wrappers and inflate the card count.
     _ITEM_CARDS_XPATH = (
-        "xpath=//li[contains(@class,'s-item') or contains(@class,'s-card')]"
-        "[.//a[contains(@href,'/itm/')]]"
+        f"xpath=//li[{xp_has_class('s-item')} or {xp_has_class('s-card')}]"
+        f"[.//a[contains(@href,'/itm/')]]"
     )
     _ITEM_CARDS_CSS = "li.s-item, li.s-card, li[data-viewport]"
 
     _CARD_LINK_XPATH = ".//a[contains(@href,'/itm/')]"
     _CARD_TITLE_XPATH = (
-        ".//div[contains(@class,'s-item__title') or contains(@class,'s-card__title')]"
-        " | .//span[@role='heading']"
+        f".//div[{xp_has_class('s-item__title')} or {xp_has_class('s-card__title')}]"
+        f" | .//span[@role='heading']"
     )
     _CARD_PRICE_XPATH = (
-        ".//span[contains(@class,'s-item__price') or contains(@class,'s-card__price')]"
+        f".//span[{xp_has_class('s-item__price')} or {xp_has_class('s-card__price')}]"
     )
 
     # --- Sidebar price filter
     # NOTE: the aria-labels are localised ("Minimum Value in ILS", "Maximum value US $"),
     # so they are matched case-insensitively by prefix rather than by an exact string.
     _PRICE_MIN = (
-        "input[name='_udlo']",
-        "input[aria-label^='Minimum Value' i]",
-        "#price-graph-knob-min",
+        "xpath=//input[@name='_udlo']",
+        f"xpath=//input[starts-with({xp_lower('@aria-label')}, 'minimum value')]",
+        "xpath=//input[@id='price-graph-knob-min']",
     )
     _PRICE_MAX = (
-        "input[name='_udhi']",
-        "input[aria-label^='Maximum value' i]",
-        "#price-graph-knob-max",
+        "xpath=//input[@name='_udhi']",
+        f"xpath=//input[starts-with({xp_lower('@aria-label')}, 'maximum value')]",
+        "xpath=//input[@id='price-graph-knob-max']",
     )
     _PRICE_SUBMIT = (
-        "button[aria-label='Submit price range']",
-        "button:has-text('Apply')",
-        "input[type='submit'][value='Go']",
+        f"xpath=//button[{xp_has_text('submit price range', '@aria-label')}]",
+        f"xpath=//button[{xp_has_text('apply')}]",
+        "xpath=//input[@type='submit' and @value='Go']",
     )
 
     _NEXT_PAGE = (
-        "a.pagination__next[href]",
-        "a[aria-label='Go to next search page'][href]",
-        "a[type='next'][href]",
+        f"xpath=//a[@href][{xp_has_class('pagination__next')}]",
+        f"xpath=//a[@href][{xp_has_text('go to next search page', '@aria-label')}]",
+        "xpath=//a[@href][@type='next']",
     )
-    _NO_RESULTS = "text=/No exact matches found|0 results for/i"
+    _NO_RESULTS = (
+        f"xpath={xp_deepest_with_text('no exact matches found')}"
+        f" | {xp_deepest_with_text('0 results for')}"
+    )
 
     # eBay injects a placeholder promo card as the first result on every SRP.
     # It has a valid /itm/ href and a price, so it must be filtered out by title.

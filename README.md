@@ -85,9 +85,23 @@ Rather than one brittle selector, each page object declares a *ranked tuple* and
 `BasePage.first_visible()` picks whichever is live. New layouts are absorbed by
 appending to a tuple.
 
-**XPath for item extraction, as specified.** Result cards are located with
-`//li[contains(@class,'s-item') or contains(@class,'s-card')][.//a[contains(@href,'/itm/')]]`,
-with a CSS fallback if it yields nothing.
+**XPath as the selector language.** Locators across the page objects are XPath,
+built from three helpers in `base_page.py` rather than written by hand:
+
+* `xp_has_class(name)` — whole-word class matching via
+  `contains(concat(' ', normalize-space(@class), ' '), ' name ')`. A plain
+  `contains(@class,'s-item')` also matches `s-item__title`, which silently
+  inflates the result-card count.
+* `xp_has_text(text)` — case-insensitive matching through `translate()`, since
+  XPath 1.0 has no `lower-case()`.
+* `xp_deepest_with_text(text)` — the innermost element holding the text, using
+  `[not(.//*[...])]`. Without it `//*[contains(., 'Added to cart')]` also matches
+  every ancestor up to `<html>`, and `.first` in document order resolves to the
+  outermost one.
+
+Where XPath genuinely outperforms CSS, it is used structurally — the cart
+subtotal has a `following`-axis fallback that walks from the "Subtotal" label to
+the next element carrying a value, which CSS cannot express at all.
 
 **Paging.** `search_items_detailed` collects matches from the current page, then
 follows "Next" until it reaches `limit` or the pages run out, bounded by
@@ -212,23 +226,24 @@ condition, the result count, and uniqueness — not semantic relevance.
 
 ## Verified run
 
-Two consecutive full runs of the whole suite (21 tests, ~9 min each):
+A clean full run of the whole suite:
 
 ```
-run 1:  18 passed, 3 skipped
-run 2:  19 passed, 2 skipped
+21 passed in 464.53s (0:07:44)
 ```
 
-Every skip is the documented cart challenge, reported with its reason and a
-screenshot path. Sample from the `shoes_under_220` scenario:
+All three live scenarios reached the cart and asserted their totals; earlier runs
+recorded 18/3 and 19/2 when eBay's challenge fired (see limitation 1). Sample
+from the `shoes_under_220` scenario:
 
 ```
 search 'shoes' <= 220.00 -> 5/5 items on 1 page
-[1/5] Quick Dry Aqua Socks    | variants {'color': 'Black', 'size': 'UK 7.5-8.5'}   | added=True
-[2/5] Half Round Shoelaces    | variants {'color': 'dark beige', 'size': '180cm'}   | added=True
-[3/5] SNORS Shoelaces         | variants {'Länge': '90 cm', 'Farbe': 'Creme', ...}  | added=True
-[4/5] ECCO Leather Insoles    | variants {'Color': 'Brown', 'Size': 'US15-15.5'}    | added=True
-[5/5] Vibram FiveFingers      | variants {'Color': 'Black', 'Size': '39'}           | added=True
+[1/5] New Balance 237 Toddler | added=True
+[2/5] Bruno Marc Chukka Boots | added=True
+[3/5] shoes S.Oliver          | added=True
+[4/5] David Tate Slip On      | added=True
+[5/5] Quick Dry Aqua Socks    | variants {'color': 'Camo Blue', 'size': 'UK 7.5-8.5'} | added=True
+Cart subtotal 1027.12 <= threshold 1100.00 - OK
 ```
 
 And the full live path, including the cart, from `rare_item_few_results` in run 2:
