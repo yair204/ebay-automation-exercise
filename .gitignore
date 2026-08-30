@@ -14,3 +14,6 @@ reports/*
 
 # ...except one curated sample run, so the submission ships a real report.
 !reports/sample-run/
+
+# macOS
+.DS_Store
